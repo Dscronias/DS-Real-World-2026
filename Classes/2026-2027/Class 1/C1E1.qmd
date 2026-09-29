@@ -71,9 +71,8 @@ The space you are currently reading is called the **source**. Below, you can fin
 
 ## Objects
 
-An **object** refers to anything that is saved in the environment. See it as **storage** for data. It can store models, tables, numbers, characters, images, videos...
-
-To **assign** data to an object (\~put data into storage), use the `->` operator (called the assignment operator). You can use `=` but this is considered **bad practice**.
+An **object** refers to anything that exists (in memory) in R. It can be models, tables, numbers, characters, images...\
+Objects can be **assigned** (bound to a name) to retrieve it later in your code. Think of it as storing it. To do this, use the `<-` operator (called the assignment operator). You can use `=` but this can arguably be considered **bad practice**.
 
 ```{r}
 first_object <- "object"
@@ -96,7 +95,7 @@ For R, use [this one](https://style.tidyverse.org/).
 
 ## Functions, packages
 
-A function is a sequence of steps to transform data.
+A function is anything that happens in R. You can think of it as a sequence of steps to transform data.
 
 - It has input(s), data that comes in
 
@@ -108,7 +107,7 @@ my_function <- function(a, b) {
 }
 ```
 
-What are a and b? What does the function do?
+*What are a and b? What does the function do?*
 
 To call (= execute) a function, you juste write its name, put parenthesis, and specify the inputs.
 
@@ -119,7 +118,7 @@ my_function(1, 2)
 Create a function that divides two inputs.
 
 ```{r}
-my_function_2 <- function() {
+my_function_2 <- function(a, b) {
 
 }
 ```
@@ -127,16 +126,18 @@ my_function_2 <- function() {
 Use `my_function(3, 3)` and `8` as inputs in `my_function_2`.
 
 ```{r}
-my_function_2()
+
 ```
 
 You won't be required to create functions in this class. You just need to understand what a function is. It makes some things go faster, though.
 
+**Packages**
+
 In R, there are packages. It is a library in which you find multiple functions, e.g. :
 
-- dplyr package: filter(), mutate(), select()…
+- dplyr package: `filter()`, `mutate()`, `select()`…
 
-- stats: lm(), t.test()…
+- stats: `lm()`, `t.test()`…
 
 - And a lot of others
 
@@ -147,6 +148,8 @@ library(tidyverse)
 This adds the tidyverse package to your environment.
 
 Let's work with data.
+
+------------------------------------------------------------------------
 
 ## Importing
 
@@ -298,6 +301,170 @@ Find the highest-paying territory and filter out the others.
 df
 ```
 
+### Data types
+
+Objects are more complicated than it seems, but it is out of scope of this class. You can refer to Advanced R, by H. Wickham for more discussions about objects and objects-oriented programming.
+
+Objects have a base type, that you can find with `typeof()`. Also, some objects have properties that you can find with `class()` (class attributes) and attributes, that you can find with `attributes()`.
+
+What differences do you find when running `typeof()` and `class()` on `df`?
+
+```{r}
+
+
+```
+
+`df` is a tibble, a specific kind of dataframe introduced by the Tidyverse ecosystem.
+
+What interests us more is data types inside dataframes. If you just view a tibble, it will list the types of the columns it contains:
+
+```{r}
+df
+```
+
+What data types do you find in the `df` columns of `df`?
+
+There are also many ways to find the types of a column :
+
+```{r}
+# One column (just different selection syntaxes)
+typeof(df$OrderDate)
+typeof(df %>% pull(OrderDate))
+typeof(df[["OrderDate"]])
+
+# All at once
+map( # Map is a bit complex. Map applies a function to each element of a list. When given a dataframe, it will apply a function to each column.
+  df,
+  typeof
+) 
+```
+
+`OrderDate` is stored as a character. This can work, but it is not optimal. There exists a date data type in R. Let's change it.
+
+You know how to modify variables using `dplyr`. If you want to change `OrderDate` to a date, you would need to use:
+
+`as_date(OrderDate, format = "%m/%d/%Y")`
+
+Why `%m/%d/%Y`? This will work here in THIS particular case. `%m` refers to month, `%d` refers to day, and `%Y` refers to year (in YYYY format). In another dataset, you might have something different, such as `%m-%d-%Y`. Or `%d/%m/%y` (`%y` is year in YY format).
+
+Modify `df` such at `OrderDate` becomes a `date`. Don't forget the function we saw earlier to modify a dataframe!
+
+```{r}
+# OrderDate = as_date(OrderDate, format = "%m/%d/%Y")
+```
+
+Run this obscure code. What do you find inside `df_dates`?
+
+```{r}
+df_dates <- 
+  map(
+    seq_len(1000),
+    ~ paste(
+        round(runif(10, 1, 28)),
+        round(runif(10, 1, 12)),
+        round(runif(10, 2013, 2024)),
+        sep = "-"
+    )
+  ) %>% 
+    set_names(paste("Date_", seq_len(1000), sep = "")) %>% 
+    as_tibble()
+```
+
+All of these are dates entered as strings, like `OrderDate`. We have 1000 of these columns, we all want these to become dates. One way to do it would be to modify them one by one (or change the code above, but it is cheating and I don't want you to cheat.)
+
+There are multiple ways to do this. If you have a quick idea of one, put it here:
+
+```{r}
+
+```
+
+------------------------------------------------------------------------
+
+------------------------------------------------------------------------
+
+------------------------------------------------------------------------
+
+------------------------------------------------------------------------
+
+------------------------------------------------------------------------
+
+------------------------------------------------------------------------
+
+------------------------------------------------------------------------
+
+------------------------------------------------------------------------
+
+------------------------------------------------------------------------
+
+------------------------------------------------------------------------
+
+------------------------------------------------------------------------
+
+------------------------------------------------------------------------
+
+------------------------------------------------------------------------
+
+------------------------------------------------------------------------
+
+------------------------------------------------------------------------
+
+------------------------------------------------------------------------
+
+------------------------------------------------------------------------
+
+------------------------------------------------------------------------
+
+------------------------------------------------------------------------
+
+------------------------------------------------------------------------
+
+------------------------------------------------------------------------
+
+------------------------------------------------------------------------
+
+------------------------------------------------------------------------
+
+------------------------------------------------------------------------
+
+------------------------------------------------------------------------
+
+------------------------------------------------------------------------
+
+------------------------------------------------------------------------
+
+------------------------------------------------------------------------
+
+------------------------------------------------------------------------
+
+------------------------------------------------------------------------
+
+------------------------------------------------------------------------
+
+------------------------------------------------------------------------
+
+------------------------------------------------------------------------
+
+------------------------------------------------------------------------
+
+Dplyr allows to modify multiple variables at once quickly, using the function across().
+
+```{r}
+# df_dates <- 
+#   df_dates %>% 
+#   mutate(
+#     across(
+#       .cols = starts_with("Date"),
+#       .fns = ~ as_date(.x, format = "%d-%m-%Y")
+#     )
+#   )
+```
+
+Look at the new functions you do not know (yet) : across() and starts_with(). What do you think these do? What do the arguments .cols and .fns refer to?
+
+Finally, there is a "\~", just after the .fns arguments. What do you think these do?
+
+These are more advanced concepts (especially \~) that you should come back to after some more experience with R. I think early exposure to more complex programming concepts is worth your time.
+
 ### Joins
 
 VERY IMPORTANT to know. Joins are used to combine tables together. You need to know this by heart, it's a must-have skill.
@@ -341,3 +508,7 @@ df %>%
 With Positron, you can use the "Posit Assistant" to call a LLM (using an API key) that will have access to your environment and that can run code.
 
 Claude is recommended, but the free version does not allow you to get an API key. You need to pay either way. Google AI Studio offers a free tier with an API key that you can use with the Posit Assistant (which is what I use).
+
+# Other resources
+
+R for Data Science: https://r4ds.hadley.nz/ Advanced R: https://adv-r.hadley.nz/index.html
