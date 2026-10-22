@@ -4,77 +4,73 @@ format: html
 editor: visual
 ---
 
-Welcome to Lab 2, in this one you will have to clean what is probably the dirtiest data you've encountered so far in your studies.
+Welcome to Lab 2. In this one you will have to clean and merge data that I totally messed up on purpose (based on problems I have encountered in my work life).
 
-# Goal
+**THIS IS GRADED** (nicely) **SO SEND ME EVERYTHING ONCE YOU'RE DONE WITH IT.** I'll send you the correction.
 
 Download data.zip and extract everything from it. Create a R script (or R Markdown in it).
 
-## Length of stay
+# Goals
 
-Gather all the datasets into a single one. Create a variable called los (length of stay): it's the time difference between the date and hour of discharge, and the date and hour of entry.
+- Get rid of all duplicates (you should get as close to the number of patients in the "number_of_patients.csv" file as possible. It might not be possible to delete all duplicates)
 
-## Modelling
+- Merge all the datasets together
 
-Model the length of stay (the variable you just created).
+- Join complexity_codes.csv to your dataset(s)
 
-You can use whatever you want: a generalised linear model, decision trees, knn regression, Random Forest, XGBoost, your homecooked neural network... As long as you are able to interpret the results.
+- Verify all variables comply with the data dictionary
+
+- Create a new variable : length of stay
+
+  - Time difference between the date and hour of discharge, and the date and hour of entry
 
 # Deliverable
 
--   One or multiple R scripts (i.e. your codes)
+- One or multiple R scripts (i.e. your codes)
 
 # Data
 
--   Synthetic emergency data from 8 emergency services (split in 8 files, one per service)
+- Synthetic emergency data from 8 emergency services (split in 8 files, one per service)
 
-    -   Each table is an emergency stays dataset over a few months in a emergency service. Each line should be a unique patient (unless there are errors in the data).
+  - Each table is an emergency stays dataset over a few months in a emergency service. Each line should be a unique patient (unless there are errors in the data).
 
--   Data dictionary
+- Data dictionary
 
--   Supplementary variable: complexity of diagnostic, to be joined with the data files
+- Supplementary variable: complexity of diagnostic, to be joined with the data files
 
--   Number of patients in each service
+- Number of patients in each service
 
 # Tips
 
--   Split your code in two files:
+- The whole point of this lab is to make you do problem solving:
 
-    -   One to explore the datasets (you can use a Quarto/RMarkdown file for this)
+  - Check the packages documentation and websites
 
-    -   One in which you do only the necessary wrangling for modelisation
+  - If you are stuck: google it, or ask Claude (don't copy-paste code you don't understand though)
 
--   The whole point of this lab is to make you do problem solving:
+- Only the datasets contain errors. The number of patients table, the supplementary variable table, and the data dictionary contain no error.
 
-    -   Check the packages documentation and websites
+- Recommended order:
 
-    -   If you are really stuck: Google it, check responses on Stack Overflow
+  - Importing
 
-    -   Don't rely too much on AI, especially if you don't understand the solutions they propose
+  - Finding duplicates
 
--   Only the datasets contain errors. The number of patients table, the supplementary variable table, and the data dictionary contain no error.
+  - Merge all datasets
 
--   Recommended order:
+    - Do it as soon as you can
 
-    -   Importing
+    - There will be a few errors specific to some datasets that will need to be solved first
 
-    -   Finding duplicates
+  - Check for errors across all datasets
 
-    -   Merge all datasets
+    - Errors in variable values, distributions...
 
-        -   Do it as soon as you can
+  - Create length of stay
 
-        -   There will be a few errors specific to some datasets that will need to be solved first
+  - Check for missing values and potential outliers (optional)
 
-    -   Check for errors across all datasets
-
-        -   Errors in variable values, distributions...
-
-    -   Create new variables (if needed)
-
-    -   Check for missing values and potential outliers
-
-    -   Imputation/deletion (if needed)
+  - Imputation/deletion (optional/if needed)
 
 # Useful snippets of code
 
@@ -174,7 +170,7 @@ df <-
 
 ## Pivot_longer
 
-You will have to use this one somewhere. Good luck. (: <https://tidyr.tidyverse.org/reference/pivot_longer.html>
+You will have to use this one somewhere. Good luck. <https://tidyr.tidyverse.org/reference/pivot_longer.html>
 
 ## Imputation
 
@@ -191,12 +187,12 @@ df <-
 
 You will have to figure out the rest yourselves. You can:
 
--   Impute the mean according to groups (here, use group_by() before the mutate)
+- Impute the mean according to groups (here, use group_by() before the mutate)
 
--   Use a linear regression:
+- Use a linear regression:
 
-    -   Keep only complete data (i.e. filter out the missing data), regress the variable to impute on relevant covariates
+  - Keep only complete data (i.e. filter out the missing data), regress the variable to impute on relevant covariates
 
-    -   Use this trained model to predict the missing data in the full dataset
+  - Use this trained model to predict the missing data in the full dataset
 
--   Other methods proposed in the last class (though just doing one may take you a lot of time)
+- Other methods proposed in the last class (though just doing one may take you a lot of time)
