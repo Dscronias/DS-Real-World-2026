@@ -1,0 +1,522 @@
+---
+title: "C2E1"
+format: html
+---
+
+# Bad data exercise
+
+This is a guided exercise in which we will clean some datasets. These come from emergency data that I have modified.
+
+Each emergency service transmit their own data, followed a standardised schema. Emergency services do not use the same software to record patients, you can expect different types of errors across services.
+
+Each entry has an id. Patients may have multiple ids if they have come at least twice in the service.
+Variables:
+- 
+
+```{r}
+# Remember to install the packages you are missing
+# install.packages("name_of_the_package_you_are_missing")
+library(tidyverse)
+library(janitor)
+library(naniar) 
+```
+
+Import datasets.rds. Before, I made you use `read_csv()`. Now, it's a RDS file, so you will have to use `read_rds()`.
+
+```{r}
+df <- read_rds("datasets.rds")
+```
+
+df is particular. It is not a dataset, as you might have expected, but a list of dataframes. Two ways to retrieve one of these:
+
+```{r}
+# Using $
+df$tab1
+df$tab2
+
+# By calling the name of the dataframe directly
+df[["tab1"]]
+df[["tab2"]]
+```
+
+## First dataset
+
+### Duplicates
+
+Let's begin with tab1. First, we will look at duplicates.
+Check if, per id, there are more than one observations (use a group_by, a summarise, and use the function n() to count the number of observations in each group). Which ids have duplicates?
+```{r}
+df[["tab1"]] %>% 
+    group_by(service, id) %>% 
+    summarise(n = n()) %>% 
+    filter(n > 1)
+```
+
+If you want to delete duplicate rows, use `distinct()`. This checks duplicates taking all variables into account. Note: I am showing the simplest case here.
+
+```{r}
+df$tab1 <- 
+    df$tab1 %>% 
+    distinct()
+```
+
+### Missing data
+
+Next step, we will look at missing data. You can check the % of missing data using the following code. I am introducing new concepts for you to learn here :
+- across() allows you to compute the same function across multiple columns. Inside across, I specify the following outputs:
+    - .cols: the list of columns you want to apply the functions to. You can put a list in here, like c("variable1", "variable2",...). You can use everything() if you want to target all columns. There are functions to quickly select columns here : https://tidyselect.r-lib.org/reference/index.html.
+    - .fns: the function you want to apply to each column. The `\(x)` here means I am calling an anonymous function. It is a function I create on the fly, without storing it in the environment (the panel on the top right). The function has one input, `x`, that corresponds to each column I want to modify. What I am doing here : I am taking the sum of each time there is a missing value in the column `x`, then I divide it by the number of observations (`n()`) and then I multiply it by a 100 to get a percentage. This function will be applied to the columns I specified in .cols
+    - .names: if you want to change the name of the modified columns. Here, I just append a prefix ("pct_") and a suffix ("missing"). {.col} is the name of the column.
+
+```{r}
+df$tab1 %>% 
+    summarise(
+        across(
+            .cols = c("service", "service_type", "id", "age", "discharge_mode"),
+            .fns = \(x) sum(is.na(x)) / n() * 100,
+            .names = "pct_{.col}_missing"
+        )
+    )
+```
+
+A better thing would be to check the % of missing data by service (i.e. how many missing values for age in service 1? In service 2?). Modify the following code so that you get these percentages by service.
+
+```{r}
+df$tab1 %>% 
+    summarise(
+        across(
+            everything(),
+            \(x) sum(is.na(x)) / n() * 100,
+            .names = "pct_{.col}_missing"
+        )
+    )
+```
+
+Seems there is not much different in the amount of missing values for age by service. We will solve this problem later.
+
+The package naniar allows you to compute summary statistics of missing data quickly.
+
+```{r}
+df$tab1 %>% 
+    miss_var_summary()
+df$tab1 %>% 
+    group_by(service) %>% 
+    miss_var_summary()
+
+# Graphically
+df$tab1 %>% 
+    vis_miss()
+```
+
+Sorting by observation, or date, can help you pinpoint patterns in missing data. For example, if there was a day during which no information about age was gathered, we would see a big chunk of missing values instead of missing values here and there.
+
+### Distributions
+
+#### Categorical variables
+
+Use the function `tabyl()` to quickly compute summary statistics of categorical variables. You can do one-way tables (one variables), two-way tables (two variables, one in column, the other in row), and three way tables (a first variable in column, the second one in row, and one table for each value of the third variable)
+
+```{r}
+df$tab1 %>% 
+    tabyl(service)
+df$tab1 %>% 
+    tabyl(service, service_type)
+```
+
+Use tabyl to look at the distribution of discharge_mode by service.
+
+```{r}
+df$tab1 %>% 
+    tabyl(discharge_mode, service)
+```
+
+It seems we have **invalid values** in discharge_mode. Some of these values are not in the data dictionary ("Death", "Hospitalisation", "Transfer"). We should modify these values.
+
+I will show you two functions, case_when and replace_values. Case_when is useful when you want to modify or create a variable according to the values of other variables. Replace_values is quicker, it looks at the values inside the variable you want to change.
+
+```{r}
+df$tab1 %>% 
+    mutate(
+        discharge_mode = 
+            # With case_when, you first specify a condition, and then the resulting value. Don't forget: you use ~ and not =.
+            case_when(
+                discharge_mode == "Death" ~ "Died",
+                discharge_mode == "Hospitalisation" ~ "Hospitalised",
+                discharge_mode == "Transfer" ~ "Transfered to other hospital",
+                .default = discharge_mode
+            )
+    )
+
+df$tab1 <- 
+    df$tab1 %>% 
+    mutate(
+        discharge_mode = 
+            discharge_mode %>% 
+            replace_values(
+                "Death" ~ "Died",
+                "Hospitalisation" ~ "Hospitalised",
+                "Transfer" ~ "Transfered to other hospital"
+            )
+    )
+```
+
+Now we can check the distribution of discharge_mode by service. We can do a chi-squared test of independence.
+
+What does the result of the test say?
+
+```{r}
+discharge_table <- 
+    df$tab1 %>% 
+    tabyl(discharge_mode, service)
+discharge_table
+chisq.test(discharge_table)
+```
+
+There are a few more functions you can use with tabyl to customise your tables.
+
+```{r}
+df$tab1 %>% 
+    tabyl(discharge_mode, service) %>% 
+    adorn_percentages(denominator = "col") %>% # Yields proportions instead of counts
+    adorn_pct_formatting() %>% # Show percentages
+    adorn_ns() # Show counts in parenthesis
+```
+
+What differences do you observe between the two services? Do they seem major? Whatever the test says, do you think there is a logical reason why there are a bit more hospitalisation in one service?
+
+#### Age
+
+Now, check age distribution by service. Compute the mean, minimum, P10, P25, P50, P75, P90, max using summarise(). Compute also P75 + 1.5(P75 - P25). You can find the quantiles using the quantile() function. For example: quantile(age, 0.25) for P25.
+You will likely have an error when using the quantile() function, use help(quantile) to troubleshoot it.
+
+```{r}
+df$tab1 %>% 
+    group_by(service) %>% 
+    summarise(
+        Mean = mean(age, na.rm = TRUE),
+        Min = min(age, na.rm = TRUE),
+        P25 = quantile(age, 0.25, na.rm = TRUE),
+        P50 = quantile(age, 0.5, na.rm = TRUE),
+        P75 = quantile(age, 0.75, na.rm = TRUE),
+        P90 = quantile(age, 0.9, na.rm = TRUE),
+        P99 = quantile(age, 0.99, na.rm = TRUE),
+        max = max(age, na.rm = TRUE),
+        upper_iqr = P75 + 1.5*(P75-P25)
+    )
+```
+
+In case you have trust issues and can't live your life normally with doing boring frequentist statistical tests, do a t-test to check if the difference in means between both services is different from 0.
+```{r}
+t.test(
+    df$tab1 %>% filter(service == "Service 1") %>% select(age),
+    df$tab1 %>% filter(service == "Service 2") %>% select(age)
+)
+```
+
+In service 1, keep only the people above 110. Look at them. (you can use View() for this) 
+```{r}
+df$tab1 %>% 
+    filter(age > 100) %>% 
+    View()
+```
+
+Does there seem to be something weird?
+
+Note: this is from real-ish data (I modified it extensively, but it is still very realistic). I do not know why in this service there are more 117 yo patients than we would reasonably expect. It is possible the software to record patients in this service does not allow for ages over 117. In this case, this is unusual and this could be a reason to contact the service to make sure. However, it would be unusual to have patients over 117.
+
+In service 2, check the number of people above 18.
+
+```{r}
+df$tab1 %>% 
+    filter(service == "Service 2") %>% 
+    filter(age > 18)
+```
+
+Is this expected?
+
+#### What to do with abnormal data?
+
+I have no magic solutions to give you, it will always depend on the analysis you will want to do, and after consulting with your colleagues.
+
+In my opinion:
+- Keeping them should be fine, as these are marginal problems
+- Patients over 18 in pediatric emergency services is very rare, but this can happen; this may not be an error. If someone comes and needs help, and for some reason they can't make it to an adult service, emergency services will not send them away.
+
+At the very least, you can tag these abnormalities.
+```{r}
+df$tab1 %>% 
+    mutate(
+        outliers = case_when(
+            service == "Service 1" & age == 117 ~ 1,
+            service == "Service 2" & age > 18 ~ 1,
+            .default = 0
+        )
+    )
+```
+
+- A lot of data cleaning is like this: you investigate your data, you find something weird, and won't know if that is expected
+- Talk to people. Make a list of all the weird things you found in your data, go through each with a supervisor or someone who is familiar with the data collection process.
+- You will find a lot of these little problems and abnormalities. Individually they seem minor, but they can pile up and make you question the results of your analyses.
+
+### Easy imputations
+
+The easiest, laziest, most stupid imputation method is taking the mean/median (for continuous variables) or the mode (for categorical variable). I do it when it's just for a few observations
+
+```{r}
+df$tab1 %>% 
+    mutate(
+        age = case_when(
+            is.na(age) ~ median(age, na.rm = TRUE),
+            .default = age
+        )
+    )
+```
+I did something very wrong here however. Why is this imputation wrong here? Can you suggest something better ?
+```{r}
+
+```
+## Second dataset
+
+This dataset is like the first one, but bigger.
+
+### Missing data analysis, again
+
+```{r}
+df$tab2 %>% 
+        vis_miss()
+df$tab2 %>% 
+    gg_miss_upset()
+```
+
+```{r}
+df$tab2 %>% 
+    group_by(service) %>% 
+    miss_var_summary() %>%
+    View()
+```
+
+gg_miss_fct allows you to find patterns between a categorical variables and missing values.
+
+```{r}
+df$tab2 %>% 
+    gg_miss_fct(discharge_mode)
+```
+
+With tabyl, do a two-way table of discharge anomaly and discharge_mode
+```{r}
+df$tab2 %>% tabyl(discharge_anomaly, discharge_mode)
+```
+
+[Explanation of discharge_anomaly]
+
+Does discharge_anomaly really have missing values?
+
+What do you think of NA values when discharge_mode == "Home"? What does this mean?
+
+We still want to use the information inside this variable (in a regression, for example), but using it as a variable would make us lose a lot of observations. What could we do?
+
+```{r}
+df$tab2 %>% 
+    mutate(
+        discharge_mode_extended = case_when(
+            discharge_mode == "Home" & discharge_anomaly %in% c("Fugue", "SCAM") ~ "Home (Fugue, SCAM)",
+            .default = discharge_mode
+        ),
+        discharge_mode_extended2 = case_when(
+            discharge_mode == "Home" & discharge_anomaly == "Fugue" ~ "Home (Fugue)",
+            discharge_mode == "Home" & discharge_anomaly == "SCAM" ~ "Home (SCAM)",
+            .default = discharge_mode
+        )
+    )
+```
+
+### Imputation, but more complex
+
+If you are familiar with more complex estimation methods, you impute values using models. For example, with a linear regressions, or using machine learning.
+
+Let's try to impute arrival_mode.
+
+First question: do we want to impute this arrival_mode everywhere?
+```{r}
+df$tab2 %>% 
+    group_by(service) %>% 
+    summarise(sum(is.na(arrival_mode)/n()*100))
+```
+
+In Conifère we have nearly 90% missing values. Doing analyses on data with 90% of made up values is a no-go. Either we:
+- don't include this variable in further analyses
+- exclude Conifère from further analysis
+(We can do both and compare results)
+
+```{r}
+df$tab2_imputed <- 
+    df$tab2 %>% 
+    filter(service != "Conifère") %>% 
+    # For illustrative purposes, I will impute dicharge_mode using the mode
+    mutate(
+        discharge_mode_i = case_when(
+            is.na(discharge_mode) ~ "Home",
+            .default = discharge_mode
+        ),
+        missing_arrival_mode = if_else(is.na(arrival_mode), 1, 0)
+    )
+```
+
+We can compare the correlation of arrival_mode with other variables, see if some can be informative.
+
+```{r}
+df$tab2_imputed %>% 
+    filter(!is.na(arrival_mode)) %>% 
+    tabyl(arrival_mode, discharge_mode_i) %>% 
+    adorn_percentages("col")
+df$tab2_imputed %>% 
+    filter(!is.na(arrival_mode)) %>% 
+    tabyl(arrival_mode, service) %>% 
+    adorn_percentages("col") # The distribution of arrival_mode in some services is very weird, btw
+df$tab2_imputed %>% 
+    group_by(arrival_mode) %>% 
+    summarise(
+        mean = mean(age),
+        min = min(age),
+        q1 = quantile(age, 0.25),
+        q2 = median(age),
+        q3 = quantile(age, 0.75),
+        max = max(age)
+    )
+```
+
+Here, each of these variables can give us information on the potential true value of arrival mode:
+- older people are more likely to come by ambulance (their cases tend to be more severe, and they may not be autonomous enough to go to the hospital by themselves)
+- services have varying distributions of arrival_mode. This can be because some hospital take priority in more severe cases, for example (which more commonly come by ambulance). This could be organisational, also. Some services may not have helicopters, some are more likely to be chosen by paramedics.
+- discharge_mode gives us information about the severity of a patient's case (severe cases are hospitalised). Case severity is also determinant in how the patient comes to the service.
+
+It's also a good idea to check the characteristics of people with missing values (in arrival_mode, here).
+
+```{r}
+df$tab2_imputed %>% 
+    tabyl(missing_arrival_mode, discharge_mode_i) %>% 
+    adorn_percentages("row")
+df$tab2_imputed %>% 
+    tabyl(missing_arrival_mode, service) %>% 
+    adorn_percentages("row")
+df$tab2_imputed %>% 
+    group_by(missing_arrival_mode) %>% 
+    summarise(
+        mean = mean(age),
+        min = min(age),
+        q1 = quantile(age, 0.25),
+        q2 = median(age),
+        q3 = quantile(age, 0.75),
+        max = max(age)
+    )
+```
+
+It seems NAs in arrival_mode:
+- Tend to be young
+- Mostly in one emergency service (typically this means there is something wrong that is specific to this service's processes)
+- Slighty more likely to be sent home
+
+```{r}
+set.seed(999)
+library(nnet)
+multinom_res <- 
+  df$tab2_imputed %>% 
+  multinom(
+    arrival_mode ~ service + age + discharge_mode_i,
+    data = .,
+    maxit = 200
+  )
+
+predictions_arrival_mode <- 
+  predict(multinom_res, newdata = df$tab2_imputed, type = "probs") %>% 
+    as_tibble()
+
+df$tab2_imputed <- 
+  df$tab2_imputed %>% 
+  bind_cols(
+    predictions_arrival_mode
+  ) %>% 
+  rowwise() %>% 
+  mutate(
+    arrival_mode_i = case_when(
+      is.na(arrival_mode) ~ 
+        sample(
+          x = c(
+            "Ambulance", "Ambulance + firefighters", "Ambulance + life support",
+            "Cops", "Helicopter", "Personal"
+          ),
+          size = 1,
+          prob = c(
+            Ambulance, `Ambulance + firefighters`, `Ambulance + life support`,
+            Cops, Helicopter, Personal
+          )
+        ),
+      .default = arrival_mode
+    )
+  ) %>% 
+  ungroup() %>% 
+  select(-c("Ambulance", "Ambulance + firefighters", "Ambulance + life support",
+            "Cops", "Helicopter", "Personal"))
+```
+
+You can check the distribution of arrival_mode between people with/without imputation. 
+```{r}
+df$tab2_imputed %>% 
+    mutate(missing_arrival = if_else(is.na(arrival_mode), 1, 0)) %>% 
+    tabyl(arrival_mode_i, missing_arrival) %>% 
+    adorn_percentages("col")
+```
+
+# Tab 1 creation
+```{r}
+
+age_df <- 
+    df$tab2 %>% 
+    filter(service %in% c("Batushka", "Denzel Curry")) %>% 
+    select(service, service_type, id, age, discharge_mode) %>% 
+    mutate(
+        service = replace_values(
+            service,
+            "Batushka" ~ "Service 1",
+            "Denzel Curry" ~ "Service 2"
+        ),
+        service_type = replace_values(
+            service_type,
+            "Adult + Pediatric" ~ "Pediatric"
+        ),
+        prob_old = sample(c(0,1), replace = TRUE, size = 23433, prob = c(0.995, 0.005)),
+        prob_miss = sample(c(0,1), replace = TRUE, size = 23433, prob = c(0.984, 0.016)),
+        age_young = round(runif(23433, 0, 18)),
+        age = case_when(
+            service_type == "Pediatric" & prob_old == 1 ~ age,
+            service_type == "Pediatric" & prob_old == 0 ~ age_young,
+            .default = age
+        ),
+        age = case_when(
+            prob_miss == 0 ~ age,
+            prob_miss == 1 ~ NA_real_
+        )
+    ) %>% 
+        select(-prob_old, -prob_miss, -age_young) %>% 
+        mutate(
+            dupe = sample(c(0,1), replace = TRUE, size = 23433, prob = c(0.9924, 0.0076))
+        )
+
+age_df <- 
+    age_df %>% 
+    bind_rows(
+        age_df %>% filter(service == "Service 1" & dupe == 1)
+    ) %>% 
+        arrange(service, id) %>% 
+    select(-dupe) %>% 
+    rowwise() %>% 
+    mutate(
+        discharge_mode = case_when(
+            is.na(discharge_mode) ~ sample(c("Death", "Home", "Hospitalisation", "Transfer"), 1, FALSE, c(0.0008454276, 0.7821145085, 0.1883894603, 0.0286506035)),
+            .default = discharge_mode
+        )
+    ) %>% 
+    ungroup()
+
+```
+
