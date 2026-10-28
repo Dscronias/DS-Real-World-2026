@@ -60,10 +60,7 @@ df[["tab2"]]
 Let's begin with tab1. First, we will look at duplicates. Check if, per id, there are more than one observations (use a group_by, a summarise, and use the function n() to count the number of observations in each group). Which ids have duplicates?
 
 ```{r}
-df[["tab1"]] %>% 
-    group_by(service, id) %>% 
-    summarise(n = n()) %>% 
-    filter(n > 1)
+
 ```
 
 If you want to delete duplicate rows, use `distinct()`. This checks duplicates taking all variables into account.
@@ -137,16 +134,10 @@ df$tab1 %>%
     miss_var_summary()
 ```
 
-Does it seem there is a link between data being missing (for the age variable) and the type of service? How could you formally test this?
+Does it seem there is a link between data being missing (for the age variable) and the type of service? How could you formally test this (i.e. with a statistical test?
 
 ```{r}
-chi_sq_table <- 
-    df$tab1 %>%
-    mutate(
-        missing_age = if_else(is.na(age), 1, 0)
-    ) %>% 
-    tabyl(service, missing_age)
-chisq.test(chi_sq_table)
+
 ```
 
 `vis_miss()` will show you graphically missing data patterns.
@@ -175,8 +166,7 @@ df$tab1 %>%
 Use tabyl to look at the distribution of discharge_mode by service.
 
 ```{r}
-df$tab1 %>% 
-    tabyl(discharge_mode, service)
+
 ```
 
 It seems we have **invalid values** in discharge_mode. Some of these values are not in the data dictionary ("Death", "Hospitalisation", "Transfer"). We should modify these values.
@@ -238,36 +228,19 @@ What differences do you observe between the two services? Do they seem major? Wh
 Now, check age distribution by service. Compute the mean, minimum, P10, P25, P50, P75, P90, max using summarise(). Compute also P75 + 1.5(P75 - P25). You can find the quantiles using the quantile() function. For example: quantile(age, 0.25) for P25. You will likely have an error when using the quantile() function, use help(quantile) to troubleshoot it.
 
 ```{r}
-df$tab1 %>% 
-    group_by(service) %>% 
-    summarise(
-        Mean = mean(age, na.rm = TRUE),
-        Min = min(age, na.rm = TRUE),
-        P25 = quantile(age, 0.25, na.rm = TRUE),
-        P50 = quantile(age, 0.5, na.rm = TRUE),
-        P75 = quantile(age, 0.75, na.rm = TRUE),
-        P90 = quantile(age, 0.9, na.rm = TRUE),
-        P99 = quantile(age, 0.99, na.rm = TRUE),
-        max = max(age, na.rm = TRUE),
-        upper_iqr = P75 + 1.5*(P75-P25)
-    )
+
 ```
 
 In case you have trust issues and can't live your life normally with doing boring frequentist statistical tests, do a t-test to check if the difference in means between both services is different from 0.
 
 ```{r}
-t.test(
-    df$tab1 %>% filter(service == "Service 1") %>% select(age),
-    df$tab1 %>% filter(service == "Service 2") %>% select(age)
-)
+
 ```
 
 In service 1, keep only the people above 110. Look at them. (you can use View() for this)
 
 ```{r}
-df$tab1 %>% 
-    filter(age > 100) %>% 
-    View()
+
 ```
 
 Does there seem to be something weird?
@@ -277,9 +250,7 @@ Note: this is from real-ish data (I modified it extensively, but it is still ver
 In service 2, check the number of people above 18.
 
 ```{r}
-df$tab1 %>% 
-    filter(service == "Service 2") %>% 
-    filter(age > 18)
+
 ```
 
 Is this expected?
@@ -360,7 +331,7 @@ With tabyl, do a two-way table of discharge anomaly and discharge_mode
 df$tab2 %>% tabyl(discharge_anomaly, discharge_mode)
 ```
 
-\[Explanation of discharge_anomaly\]
+**\[Explanation of discharge_anomaly\]**
 
 Does discharge_anomaly really have missing values?
 
@@ -369,18 +340,7 @@ What do you think of NA values when discharge_mode == "Home"? What does this mea
 We still want to use the information inside this variable (in a regression, for example), but using it as a variable would make us lose a lot of observations. What could we do?
 
 ```{r}
-df$tab2 %>% 
-    mutate(
-        discharge_mode_extended = case_when(
-            discharge_mode == "Home" & discharge_anomaly %in% c("Fugue", "SCAM") ~ "Home (Fugue, SCAM)",
-            .default = discharge_mode
-        ),
-        discharge_mode_extended2 = case_when(
-            discharge_mode == "Home" & discharge_anomaly == "Fugue" ~ "Home (Fugue)",
-            discharge_mode == "Home" & discharge_anomaly == "SCAM" ~ "Home (SCAM)",
-            .default = discharge_mode
-        )
-    )
+
 ```
 
 ### Imputation, but more complex
@@ -511,58 +471,4 @@ df$tab2_imputed %>%
     mutate(missing_arrival = if_else(is.na(arrival_mode), 1, 0)) %>% 
     tabyl(arrival_mode_i, missing_arrival) %>% 
     adorn_percentages("col")
-```
-
-# Tab 1 creation
-
-```{r}
-
-age_df <- 
-    df$tab2 %>% 
-    filter(service %in% c("Batushka", "Denzel Curry")) %>% 
-    select(service, service_type, id, age, discharge_mode) %>% 
-    mutate(
-        service = replace_values(
-            service,
-            "Batushka" ~ "Service 1",
-            "Denzel Curry" ~ "Service 2"
-        ),
-        service_type = replace_values(
-            service_type,
-            "Adult + Pediatric" ~ "Pediatric"
-        ),
-        prob_old = sample(c(0,1), replace = TRUE, size = 23433, prob = c(0.995, 0.005)),
-        prob_miss = sample(c(0,1), replace = TRUE, size = 23433, prob = c(0.984, 0.016)),
-        age_young = round(runif(23433, 0, 18)),
-        age = case_when(
-            service_type == "Pediatric" & prob_old == 1 ~ age,
-            service_type == "Pediatric" & prob_old == 0 ~ age_young,
-            .default = age
-        ),
-        age = case_when(
-            prob_miss == 0 ~ age,
-            prob_miss == 1 ~ NA_real_
-        )
-    ) %>% 
-        select(-prob_old, -prob_miss, -age_young) %>% 
-        mutate(
-            dupe = sample(c(0,1), replace = TRUE, size = 23433, prob = c(0.9924, 0.0076))
-        )
-
-age_df <- 
-    age_df %>% 
-    bind_rows(
-        age_df %>% filter(service == "Service 1" & dupe == 1)
-    ) %>% 
-        arrange(service, id) %>% 
-    select(-dupe) %>% 
-    rowwise() %>% 
-    mutate(
-        discharge_mode = case_when(
-            is.na(discharge_mode) ~ sample(c("Death", "Home", "Hospitalisation", "Transfer"), 1, FALSE, c(0.0008454276, 0.7821145085, 0.1883894603, 0.0286506035)),
-            .default = discharge_mode
-        )
-    ) %>% 
-    ungroup()
-
 ```
